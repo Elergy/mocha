@@ -433,4 +433,87 @@ describe('Runner', function () {
       });
     });
   });
+
+  describe('.run', function () {
+    describe('"test end" event', function () {
+      it('should emit "test end" event for each test', function (done) {
+        var finishedTestTitles = [];
+
+        suite.addTest(new Test('first test', noop));
+        suite.addTest(new Test('second (failed) test', function () {
+          expect(1 + 1).to.equal(3);
+        }));
+        suite.addTest(new Test('third test', noop));
+
+        runner.on('test end', function (test) {
+          finishedTestTitles.push(test.title);
+        });
+
+        runner.run(function () {
+          finishedTestTitles.should.deepEqual([
+            'first test',
+            'second (failed) test',
+            'third test'
+          ]);
+          done();
+        });
+      });
+
+      it('should have a proper duration field', function (done) {
+        var finishedTestDuration = [];
+
+        function doSomethingForSeveralMilliseconds () {
+          var result = 0;
+          for (var i = 0; i < 10000000; i++) {
+            result = i;
+          }
+
+          expect(result).to.equal(100001);
+        }
+
+        function doneAfterTimeout (done) {
+          setTimeout(function () {
+            var result = 0;
+            for (var i = 0; i < 10000000; i++) {
+              result = i;
+            }
+            if (result > 0) {
+              done();
+            }
+          }, 10);
+        }
+
+        function failAfterSeveralMilliseconds () {
+          var result = 0;
+          for (var i = 0; i < 10000000; i++) {
+            result = i;
+          }
+
+          expect(result).to.equal(500);
+        }
+
+        function failAfterTimeout (done) {}
+
+        suite.addTest(new Test('synchronous test', doSomethingForSeveralMilliseconds));
+        suite.addTest(new Test('successful asynchronous test', doneAfterTimeout));
+        suite.addTest(new Test('failed synchronous test', failAfterSeveralMilliseconds));
+
+        var failedAsynchronousTest = new Test('failed asynchronous test', failAfterTimeout);
+        suite.addTest(failedAsynchronousTest);
+        failedAsynchronousTest.timeout(20);
+
+        runner.on('test end', function (test) {
+          finishedTestDuration.push(test.duration);
+        });
+
+        runner.run(function () {
+          finishedTestDuration.forEach(function (duration) {
+            duration.should.be.above(0);
+          });
+
+          done();
+        });
+      });
+    });
+  });
 });
